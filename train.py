@@ -29,16 +29,16 @@ def launch_params():
 
     parser.add_argument('--device', 
                     help='running device for training model', 
-                    default = 'cuda:0')
+                    default = 'cpu')
     parser.add_argument('--dim_DQN_Qnet', type = int,
                     help='parameters for DQN-Qnet architecture', 
                     default = 32)
     parser.add_argument('--OBSERVE', type = int,
                     help='step for observe', 
-                    default = 10)   
+                    default = 2000)   
     parser.add_argument('--EXPLORE', type = int,
                     help='step for explore, and after that the net would train', 
-                    default = 300000)  
+                    default = 20)  
     parser.add_argument('--INITIAL_EPSILON', type = float,
                     help='epsilon at the beginning of explore', 
                     default = 0.1)
@@ -47,20 +47,23 @@ def launch_params():
                     default = 0.0001)
     parser.add_argument('--REPLAY_MEMORY', type = float,
                     help='buffer size for replay', 
-                    default = 50000)
-    parser.add_argument('--CONTINUOUS_FRAME', type = float,
-                    help='buffer size for replay', 
+                    default = 2000)
+    parser.add_argument('--CONTINUOUS_FRAME', type = int,
+                    help='number of continuous frame to be stacked together', 
                     default = 4)
+    parser.add_argument('--MINIBATCH', type = int,
+                    help='mini batch size', 
+                    default = 16)
 
 def create_actionspace(args):
     actionspace = {}
     if args.env == "MineRLTreechop-v0":
         ## the action space is shown in ./image/Action Discretization.png
         actionspace = {
-            0 : {'camera': [5, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
-            1 : {'camera': [-5, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
-            2 : {'camera': [0, 5], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
-            3 : {'camera': [0, -5], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
+            0 : {'camera': [1, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
+            1 : {'camera': [-1, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
+            2 : {'camera': [0, 1], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
+            3 : {'camera': [0, -1], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
             4 : {'camera': [0, 0], 'forward':1, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
             5 : {'camera': [0, 0], 'forward':1, 'left':0, 'right':0, 'back':0, 'jump':1, 'attack':1},
             6 : {'camera': [0, 0], 'forward':0, 'left':1, 'right':0, 'back':0, 'jump':0, 'attack':1},
@@ -83,18 +86,3 @@ if __name__ == "__main__":
     obs  = env.reset()
     net = DQN(args, actionspace, env)
     net.train()
-
-    # while True:
-    #     action = env.action_space.sample()
-
-    #     # # action['camera'] = [0, 0.03*obs["compassAngle"]]
-    #     # action['back'] = 0
-    #     # action['forward'] = 1
-    #     # action['jump'] = 1
-    #     # action['attack'] = 1
-
-    #     obs, reward, done, info = env.step(
-    #         action)
-
-    #     net_reward += reward
-    #     print("Total reward: ", net_reward)
