@@ -2,7 +2,7 @@ import minerl
 import gym
 import argparse
 
-from network.DQN import DQN
+from network.DQN import DQN, DoubleDQN
 
 
 parser = argparse.ArgumentParser()
@@ -11,13 +11,16 @@ def launch_params():
     parser.add_argument('--env',
                         help='the environment for minerl to make', 
                         default = 'MineRLTreechop-v0')
+    parser.add_argument('--port',
+                        help='the port to launch Minecraft', 
+                        default = 5656)
 
     parser.add_argument('--gamma',  type = float,
                     help='parameters for DQN-Qnet architecture', 
                     default = 0.99)   
     parser.add_argument('--actionNum', type = int,
                     help='the number of discrete action combination', 
-                    default = 10)
+                    default = 8)
 
     ######################### network architecture ##################
 
@@ -29,16 +32,16 @@ def launch_params():
 
     parser.add_argument('--device', 
                     help='running device for training model', 
-                    default = 'cpu')
+                    default = 'cuda:0')
     parser.add_argument('--dim_DQN_Qnet', type = int,
                     help='parameters for DQN-Qnet architecture', 
                     default = 32)
     parser.add_argument('--OBSERVE', type = int,
                     help='step for observe', 
-                    default = 2000)   
+                    default = 100)   
     parser.add_argument('--EXPLORE', type = int,
                     help='step for explore, and after that the net would train', 
-                    default = 20)  
+                    default = 300000)  
     parser.add_argument('--INITIAL_EPSILON', type = float,
                     help='epsilon at the beginning of explore', 
                     default = 0.1)
@@ -47,29 +50,42 @@ def launch_params():
                     default = 0.0001)
     parser.add_argument('--REPLAY_MEMORY', type = float,
                     help='buffer size for replay', 
-                    default = 2000)
+                    default = 50000)
     parser.add_argument('--CONTINUOUS_FRAME', type = int,
                     help='number of continuous frame to be stacked together', 
                     default = 4)
     parser.add_argument('--MINIBATCH', type = int,
                     help='mini batch size', 
                     default = 16)
+    parser.add_argument('--UPDATE_INTERVAL', type = int,
+                    help='update interval between current network and target network', 
+                    default = 10)
 
 def create_actionspace(args):
     actionspace = {}
     if args.env == "MineRLTreechop-v0":
         ## the action space is shown in ./image/Action Discretization.png
+        # actionspace = {
+        #     0 : {'camera': [5, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
+        #     1 : {'camera': [-5, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
+        #     2 : {'camera': [0, 5], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
+        #     3 : {'camera': [0, -5], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
+        #     4 : {'camera': [0, 0], 'forward':1, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
+        #     5 : {'camera': [0, 0], 'forward':1, 'left':0, 'right':0, 'back':0, 'jump':1, 'attack':1},
+        #     6 : {'camera': [0, 0], 'forward':0, 'left':1, 'right':0, 'back':0, 'jump':0, 'attack':1},
+        #     7 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':1, 'back':0, 'jump':0, 'attack':1},
+        #     8 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':0, 'back':1, 'jump':0, 'attack':1},
+        #     9 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':1, 'attack':1},
+        # }
         actionspace = {
-            0 : {'camera': [1, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
-            1 : {'camera': [-1, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
-            2 : {'camera': [0, 1], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
-            3 : {'camera': [0, -1], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
-            4 : {'camera': [0, 0], 'forward':1, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
-            5 : {'camera': [0, 0], 'forward':1, 'left':0, 'right':0, 'back':0, 'jump':1, 'attack':1},
-            6 : {'camera': [0, 0], 'forward':0, 'left':1, 'right':0, 'back':0, 'jump':0, 'attack':1},
-            7 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':1, 'back':0, 'jump':0, 'attack':1},
-            8 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':0, 'back':1, 'jump':0, 'attack':1},
-            9 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':1, 'attack':1},
+            0 : {'camera': [0, 5], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
+            1 : {'camera': [0, -5], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
+            2 : {'camera': [0, 0], 'forward':1, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
+            3 : {'camera': [0, 0], 'forward':1, 'left':0, 'right':0, 'back':0, 'jump':1, 'attack':1},
+            4 : {'camera': [0, 0], 'forward':0, 'left':1, 'right':0, 'back':0, 'jump':0, 'attack':1},
+            5 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':1, 'back':0, 'jump':0, 'attack':1},
+            6 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':0, 'back':1, 'jump':0, 'attack':1},
+            7 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':1, 'attack':1},
         }
     assert len(actionspace.keys()) == args.actionNum, "action_num mismath"
     return actionspace
@@ -83,6 +99,9 @@ if __name__ == "__main__":
 
     # env = None
     env = gym.make(args.env)
+
+    env.make_interactive(port=args.port, realtime=True)
+
     obs  = env.reset()
-    net = DQN(args, actionspace, env)
+    net = DoubleDQN(args, actionspace, env)
     net.train()

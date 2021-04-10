@@ -13,3 +13,7 @@ class MineCraftRL(metaclass=ABCMeta):
     @abstractmethod
     def step_train(self):
         pass
+
+    @abstractmethod
+    def new_reward(self):
+        pass    
