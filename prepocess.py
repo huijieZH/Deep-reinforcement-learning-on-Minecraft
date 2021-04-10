@@ -56,7 +56,11 @@ if __name__ == "__main__":
         video = imageio.get_reader(videopath)
 
         ## video
-        sequential_frame = np.array(list(video))
+        frames = []
+        for cur_frame in video:
+            frames.append(cur_frame)
+        sequential_frame = np.stack(frames[:], axis=0)
+        print(sequential_frame.shape)
 
         data = np.load(datapath)
         ## this dictionary has key

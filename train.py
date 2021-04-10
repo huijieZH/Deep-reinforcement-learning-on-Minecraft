@@ -39,7 +39,7 @@ def launch_params():
                     default = 32)
     parser.add_argument('--OBSERVE', type = int,
                     help='step for observe', 
-                    default = 100)   
+                    default = 20000)   
     parser.add_argument('--EXPLORE', type = int,
                     help='step for explore, and after that the net would train', 
                     default = 300000)  
