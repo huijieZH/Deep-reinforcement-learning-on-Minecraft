@@ -1,7 +1,8 @@
 import argparse
 import json
 import os
-import numpy
+import numpy as np
+import imageio
 
 parser = argparse.ArgumentParser()
 def launch_params():
@@ -51,5 +52,25 @@ if __name__ == "__main__":
     for package in packages:
         datapath = os.path.join(args.DATASET_LOC, package, "rendered.npz")
         videopath = os.path.join(args.DATASET_LOC, package, "recording.mp4")
+
+        video = imageio.get_reader(videopath)
+
+        ## video
+        sequential_frame = np.array(list(video))
+
+        data = np.load(datapath)
+        ## this dictionary has key
+        # "reward",
+        # "action$forward"
+        # "action$left"
+        # "action$back"
+        # "action$right"
+        # "action$jump"
+        # "action$sneak"
+        # "action$sprint"
+        # "action$attack"
+        # "action$camera"
+        print(data["action$camera"])
+    pass
 
     
