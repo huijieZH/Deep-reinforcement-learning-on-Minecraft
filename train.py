@@ -36,7 +36,7 @@ def launch_params():
 
     parser.add_argument('--device', 
                     help='running device for training model', 
-                    default = 'cuda:0')
+                    default = 'cpu')
     parser.add_argument('--dim_DQN_Qnet', type = int,
                     help='parameters for DQN-Qnet architecture', 
                     default = 32)
