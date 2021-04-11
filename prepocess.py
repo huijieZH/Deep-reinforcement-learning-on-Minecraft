@@ -39,6 +39,7 @@ def create_actionspace(args):
             5 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':1, 'back':0, 'jump':0, 'attack':1},
             6 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':0, 'back':1, 'jump':0, 'attack':1},
             7 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':1, 'attack':1},
+            8 : {'camera': [0, 0], 'forward':0, 'left':0, 'right':0, 'back':0, 'jump':0, 'attack':1},
         }
     assert len(actionspace.keys()) == args.actionNum, "action_num mismath"
     return actionspace

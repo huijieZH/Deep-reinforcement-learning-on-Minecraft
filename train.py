@@ -21,7 +21,10 @@ def launch_params():
                     default = 0.99)   
     parser.add_argument('--actionNum', type = int,
                     help='the number of discrete action combination', 
-                    default = 8)
+                    default = 9)
+    parser.add_argument('--saveStep', type = int,
+                    help='the number of step between savings', 
+                    default = 50000)
 
     ######################### network architecture ##################
 
@@ -51,13 +54,13 @@ def launch_params():
                     default = 0.0001)
     parser.add_argument('--REPLAY_MEMORY', type = float,
                     help='buffer size for replay', 
-                    default = 50000)
+                    default = 10000)
     parser.add_argument('--CONTINUOUS_FRAME', type = int,
                     help='number of continuous frame to be stacked together', 
                     default = 4)
     parser.add_argument('--MINIBATCH', type = int,
                     help='mini batch size', 
-                    default = 16)
+                    default = 32)
     parser.add_argument('--UPDATE_INTERVAL', type = int,
                     help='update interval between current network and target network', 
                     default = 10)
