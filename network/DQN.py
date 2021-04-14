@@ -61,7 +61,6 @@ class DQN(MineCraftRL):
         self.args = args
         ## this is the current network
         self.Qnet = DQN_QNet(self.args)
-        summary(self.Qnet.to(torch.device('cuda:0')), (self.args.CONTINUOUS_FRAME*3,64,64))
         self.Qnet.to(torch.device(self.args.device))
 
         ## this is the target network
