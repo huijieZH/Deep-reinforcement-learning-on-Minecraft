@@ -154,9 +154,13 @@ class DQN(MineCraftRL):
         return done
     
     def step_interact(self, action_index):
-        action_take = self.actionspace[action_index]
+        action_take = self.actionspace[str(action_index)]
         for a in action_take:
-            self.action[a] = action_take[a]
+            if a == "camera":
+                self.action[a] = action_take[a]
+            else:
+                ## add some uncertainty
+                self.action[a] = 1 if np.random.rand() < action_take[a] else 0
         
         obs, reward, done, info = self.env.step(self.action)
         state = torch.tensor(obs["pov"]).to(torch.float32)
@@ -217,7 +221,6 @@ class DQN(MineCraftRL):
             'action': self.action,
             'args':self.args,
             }, "./saved_network/" + self.arch + "_" + self.args.env + "_" + "0"*(7 - len(str(step))) + str(step)+".pt")
-
 
 class DoubleDQN(DQN):
     def __init__(self, args, actionspace, env):

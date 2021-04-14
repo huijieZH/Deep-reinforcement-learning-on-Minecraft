@@ -8,6 +8,18 @@ from prepocess import create_actionspace
 
 parser = argparse.ArgumentParser()
 def launch_params():
+    ######################### prepocess ############################
+    parser.add_argument('--ROOT',
+                        help='root',
+                        default = '/home/huijiezhang/DeepReinforcementLearningMinecraft/EECS_545_Final_Project')
+    parser.add_argument('--DATASET_LOC',
+                        help='location of the dataset', 
+                        default = '/home/huijiezhang/DeepReinforcementLearningMinecraft/EECS_545_Final_Project/data/MineRLTreechop-v0')
+    ####  actionspace
+    parser.add_argument('--ACTIONSPACE_TYPE',choices=['manually', 'k_means'],
+                        help='way to define the actionsapce',
+                        default='k_means')
+
     ######################### about RL training #####################
     parser.add_argument('--env',
                         help='the environment for minerl to make', 
@@ -21,7 +33,7 @@ def launch_params():
                     default = 0.99)   
     parser.add_argument('--actionNum', type = int,
                     help='the number of discrete action combination', 
-                    default = 9)
+                    default = 32)
     parser.add_argument('--saveStep', type = int,
                     help='the number of step between savings', 
                     default = 50000)
@@ -36,7 +48,7 @@ def launch_params():
 
     parser.add_argument('--device', 
                     help='running device for training model', 
-                    default = 'cuda:0')
+                    default = 'cpu')
     parser.add_argument('--dim_DQN_Qnet', type = int,
                     help='parameters for DQN-Qnet architecture', 
                     default = 32)
@@ -57,7 +69,7 @@ def launch_params():
                     default = 10000)
     parser.add_argument('--CONTINUOUS_FRAME', type = int,
                     help='number of continuous frame to be stacked together', 
-                    default = 4)
+                    default = 1)
     parser.add_argument('--MINIBATCH', type = int,
                     help='mini batch size', 
                     default = 32)
