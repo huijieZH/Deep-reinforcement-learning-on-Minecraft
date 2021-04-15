@@ -4,7 +4,8 @@ import argparse
 
 from network.DQN import DQN, DoubleDQN
 
-from prepocess import create_actionspace
+from prepocess import create_actionspace, prepare_dataset
+
 
 parser = argparse.ArgumentParser()
 def launch_params():
@@ -19,6 +20,19 @@ def launch_params():
     parser.add_argument('--ACTIONSPACE_TYPE',choices=['manually', 'k_means'],
                         help='way to define the actionsapce',
                         default='k_means')
+    parser.add_argument('--actionNum', type = int,
+                    help='the number of discrete action combination', 
+                    default = 32)
+    ##### prepare dataset
+    parser.add_argument('--PREPARE_DATASET',
+                        help='if True, would automatically prepare dataset',
+                        default=False)
+    parser.add_argument('--DATA_TOTAL',
+                        help='total data from demonstration',
+                        default=400000)
+    parser.add_argument('--DATA_PER_FILE',
+                        help='per file data from demonstration, please remove the last file if it has different number',
+                        default=5000)
 
     ######################### about RL training #####################
     parser.add_argument('--env',
@@ -31,14 +45,15 @@ def launch_params():
     parser.add_argument('--gamma',  type = float,
                     help='parameters for DQN-Qnet architecture', 
                     default = 0.99)   
-    parser.add_argument('--actionNum', type = int,
-                    help='the number of discrete action combination', 
-                    default = 32)
+
     parser.add_argument('--saveStep', type = int,
                     help='the number of step between savings', 
                     default = 50000)
 
     ######################### network architecture ##################
+    parser.add_argument('--ARCH', choices=['DQN', 'DoubleDQN', 'DQFD'],
+                    help='the architecture for reinforcement learning', 
+                    default = 'DoubleDQN')
 
     ############# DQN 
     parser.add_argument('--LOADING_MODEL', 
@@ -48,13 +63,13 @@ def launch_params():
 
     parser.add_argument('--device', 
                     help='running device for training model', 
-                    default = 'cpu')
+                    default = 'cuda:0')
     parser.add_argument('--dim_DQN_Qnet', type = int,
                     help='parameters for DQN-Qnet architecture', 
                     default = 32)
     parser.add_argument('--OBSERVE', type = int,
                     help='step for observe', 
-                    default = 20000)   
+                    default = 200)   
     parser.add_argument('--EXPLORE', type = int,
                     help='step for explore, and after that the net would train', 
                     default = 300000)  
@@ -77,6 +92,13 @@ def launch_params():
                     help='update interval between current network and target network', 
                     default = 10)
 
+    ######################### Dataset ##################
+    parser.add_argument('--INITIAL_R', type = float,
+                    help='initial ratio for the demonstration data in the training mini batch', 
+                    default = 0.8)
+    parser.add_argument('--FINAL_R', type = float,
+                    help='final ratio for the demonstration data in the training mini batch', 
+                    default = 0.01)
 
     
 
@@ -84,9 +106,16 @@ if __name__ == "__main__":
     launch_params()
     args = parser.parse_args()
 
+    
+
+    ## create action space
     actionspace = create_actionspace(args)
 
-    # env = None
+    ## prepare dataset
+    if args.PREPARE_DATASET:
+        prepare_dataset(args, actionspace)
+    
+    ## train network
     env = gym.make(args.env)
 
     env.make_interactive(port=args.port, realtime=True)

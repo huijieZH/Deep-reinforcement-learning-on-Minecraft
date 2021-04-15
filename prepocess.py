@@ -35,7 +35,7 @@ def launch_params():
                         default=True)
     parser.add_argument('--DATA_TOTAL',
                         help='total data from demonstration',
-                        default=100000)
+                        default=400000)
     parser.add_argument('--DATA_PER_FILE',
                         help='total data from demonstration',
                         default=5000)
@@ -137,8 +137,12 @@ def prepare_dataset(args, actionspace):
         per_file += 1
         total += 1
         
-        s = np.moveaxis(current_state['pov'][0, 0, :, :, :], [0, 1, 2], [2, 0, 1])
-        s_new = np.moveaxis(current_state['pov'][0, 1, :, :, :], [0, 1, 2], [2, 0, 1])
+        s = current_state['pov'][0, 0, :, :, :].astype(np.float32)
+        s_normalize = (s - np.mean(s.reshape((-1, 3)), axis = 0))/np.std(s.reshape((-1, 3)), axis = 0)
+        s = np.moveaxis(s_normalize, -1, 0)
+        s_new = current_state['pov'][0, 1, :, :, :].astype(np.float32)
+        s_new_normalize = (s_new - np.mean(s_new.reshape((-1, 3)), axis = 0))/np.std(s_new.reshape((-1, 3)), axis = 0)
+        s_new = np.moveaxis(s_new_normalize, -1, 0)
         r = np.array([reward[0, 0]])
         t = np.array([not done[0, 0]])
         a = np.array([ action["camera"][0, 0, 0],

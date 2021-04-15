@@ -14,7 +14,13 @@ import time
 ## my own module
 import sys
 sys.path.append("./")
+sys.path.append("../dataloader")
 from .Arch import MineCraftRL
+try:
+    from dataloader import MineCraftRLDataLoader
+except ImportError:    
+    from dataloader.dataloader import MineCraftRLDataLoader
+
 
 class DQN_QNet(nn.Module):
     def __init__(self, args):
@@ -76,28 +82,33 @@ class DQN(MineCraftRL):
         self.S = torch.zeros((self.args.CONTINUOUS_FRAME, 3, 64, 64))
         self.totalReward = 0
 
+
         self.criterion = nn.MSELoss()
         self.optimizer = optim.Adam(self.Qnet.parameters(), 5e-4, weight_decay=1e-4)
+
+        self.dataLoader = MineCraftRLDataLoader(self.args, self.replaybuffer)
 
         self.losses = []
         self.totalRewards = []
 
         self.initialstep = 0
         self.initialepsilon = self.args.INITIAL_EPSILON
-
+        self.initialR = self.args.INITIAL_R
 
     def train(self):
         epsilon = self.initialepsilon
         step = self.initialstep
+        r = self.initialR
         while True:
             step += 1
             if step < self.args.OBSERVE:
                 done = self.step_observe(step, epsilon)
             elif step < self.args.OBSERVE + self.args.EXPLORE:
                 epsilon -= (self.args.INITIAL_EPSILON - self.args.FINAL_EPSILON) / self.args.EXPLORE
-                done = self.step_train(step, epsilon)
+                r -= (self.args.INITIAL_R - self.args.FINAL_R) / self.args.EXPLORE
+                done = self.step_train(step, epsilon, r)
             else:
-                done = self.step_train(step, epsilon)
+                done = self.step_train(step, epsilon, r)
             ## refresh every 10000 steps or done
             if done:
                 self.totalReward = 0
@@ -111,7 +122,7 @@ class DQN(MineCraftRL):
 
         return done
 
-    def step_train(self, step, epsilon):
+    def step_train(self, step, epsilon, r):
         input = self.S.reshape((1, -1, 64, 64)).to(torch.device(self.args.device))
         output = self.Qnet(input)
         # choose an action epsilon greedily
@@ -124,7 +135,7 @@ class DQN(MineCraftRL):
         reward, done = self.step_interact(action_index)
 
         #given minibatch
-        X_minibatch, Y_minibatch = self.get_minibatch()
+        X_minibatch, Y_minibatch = self.get_minibatch(r)
         
         self.optimizer.zero_grad()
         loss = self.criterion(X_minibatch, Y_minibatch)
@@ -163,7 +174,7 @@ class DQN(MineCraftRL):
         
         obs, reward, done, info = self.env.step(self.action)
         state = torch.tensor(obs["pov"]).to(torch.float32)
-        state_normalize = (state - torch.mean(state.reshape((3, -1)), axis = 1))/torch.std(state.reshape((3, -1)), axis = 1)
+        state_normalize = (state - torch.mean(state.reshape((-1, 3)), axis = 0))/torch.std(state.reshape((-1, 3)), axis = 0)
         state_normalize = state_normalize.permute(2, 0, 1)
 
         S_new = torch.cat((self.S[1:, :, :, :], state_normalize.reshape((1, 3, 64, 64))), axis = 0)
@@ -183,25 +194,36 @@ class DQN(MineCraftRL):
 
         return reward, done
     
-    def get_minibatch(self):
-        miniBatch = random.sample(self.replaybuffer, self.args.MINIBATCH)
+    def get_minibatch(self, r):
+        # miniBatch = random.sample(self.replaybuffer, self.args.MINIBATCH)
 
-        Y_minibatch = torch.zeros((self.args.MINIBATCH,)).to(torch.device(self.args.device))
-        X_minibatch = torch.zeros((self.args.MINIBATCH,)).to(torch.device(self.args.device))
+        # Y_minibatch = torch.zeros((self.args.MINIBATCH,)).to(torch.device(self.args.device))
+        # X_minibatch = torch.zeros((self.args.MINIBATCH,)).to(torch.device(self.args.device))
 
-        ## batchsize * 12 * 64 * 64
-        S_batch = torch.stack([b[0] for b in miniBatch]).to(torch.device(self.args.device))
-        ## batchsize * 10
-        A_batch = torch.stack([b[1] for b in miniBatch]).to(torch.device(self.args.device))
-        ## batchsize 
-        R_batch = torch.stack([b[2] for b in miniBatch]).to(torch.device(self.args.device))
-        St1_batch = torch.stack([b[3] for b in miniBatch]).to(torch.device(self.args.device))
-        Done_batch = torch.stack([b[4] for b in miniBatch]).to(dtype = torch.float32, device = torch.device(self.args.device))
+        # ## batchsize * 3 * 64 * 64
+        # S_batch = torch.stack([b[0] for b in miniBatch]).to(torch.device(self.args.device))
+        # ## batchsize * 10
+        # A_batch = torch.stack([b[1] for b in miniBatch]).to(torch.device(self.args.device))
+        # ## batchsize 
+        # R_batch = torch.stack([b[2] for b in miniBatch]).to(torch.device(self.args.device))
+        # St1_batch = torch.stack([b[3] for b in miniBatch]).to(torch.device(self.args.device))
+        # Done_batch = torch.stack([b[4] for b in miniBatch]).to(dtype = torch.float32, device = torch.device(self.args.device))
 
-        
+        minibatch_memory, minibatch_memory_demo = self.dataLoader.getbatch(r)
+        S_batch, A_batch, R_batch, St1_batch, Done_batch = minibatch_memory
+        S_batch_demo, A_batch_demo, R_batch_demo, St1_batch_demo, Done_batch_demo = minibatch_memory_demo
+
+        S_batch_cat = torch.cat((S_batch, S_batch_demo), axis = 0)
+        A_batch_cat = torch.cat((A_batch, A_batch_demo), axis = 0)
+        R_batch_cat = torch.cat((R_batch, R_batch_demo), axis = 0)
+        St1_batch_cat = torch.cat((St1_batch, St1_batch_demo), axis = 0)
+        Done_batch_cat = torch.cat((Done_batch, Done_batch_demo), axis = 0)
         # DQN
-        Y_minibatch = R_batch.reshape((-1, 1)) + self.args.gamma * torch.max(self.target_Qnet(St1_batch), axis = 1)[0].reshape((-1, 1)) * Done_batch.reshape((-1, 1))
-        X_minibatch = torch.sum(A_batch * self.Qnet(S_batch), axis = 1, keepdim = True)
+        
+        # Y_minibatch = R_batch.reshape((-1, 1)) + self.args.gamma * torch.max(self.target_Qnet(St1_batch), axis = 1)[0].reshape((-1, 1)) * Done_batch.reshape((-1, 1))
+        # X_minibatch = torch.sum(A_batch * self.Qnet(S_batch), axis = 1, keepdim = True)
+        Y_minibatch = R_batch_cat.reshape((-1, 1)) + self.args.gamma * torch.max(self.target_Qnet(St1_batch_cat), axis = 1)[0].reshape((-1, 1)) * Done_batch_cat.reshape((-1, 1))
+        X_minibatch = torch.sum(A_batch_cat * self.Qnet(S_batch_cat), axis = 1, keepdim = True)
 
         return X_minibatch, Y_minibatch
 
@@ -226,25 +248,39 @@ class DoubleDQN(DQN):
         super().__init__(args, actionspace, env)
         self.arch = "DoubleDQN"
     
-    def get_minibatch(self):
-        miniBatch = random.sample(self.replaybuffer, self.args.MINIBATCH)
+    def get_minibatch(self, r):
+        # miniBatch = random.sample(self.replaybuffer, self.args.MINIBATCH)
 
-        Y_minibatch = torch.zeros((self.args.MINIBATCH,)).to(torch.device(self.args.device))
-        X_minibatch = torch.zeros((self.args.MINIBATCH,)).to(torch.device(self.args.device))
+        # Y_minibatch = torch.zeros((self.args.MINIBATCH,)).to(torch.device(self.args.device))
+        # X_minibatch = torch.zeros((self.args.MINIBATCH,)).to(torch.device(self.args.device))
 
-        ## batchsize * 12 * 64 * 64
-        S_batch = torch.stack([b[0] for b in miniBatch]).to(torch.device(self.args.device))
-        ## batchsize * 10
-        A_batch = torch.stack([b[1] for b in miniBatch]).to(torch.device(self.args.device))
-        ## batchsize 
-        R_batch = torch.stack([b[2] for b in miniBatch]).to(torch.device(self.args.device))
-        St1_batch = torch.stack([b[3] for b in miniBatch]).to(torch.device(self.args.device))
-        Done_batch = torch.stack([b[4] for b in miniBatch]).to(dtype = torch.float32, device = torch.device(self.args.device))
+        # ## batchsize * 12 * 64 * 64
+        # S_batch = torch.stack([b[0] for b in miniBatch]).to(torch.device(self.args.device))
+        # ## batchsize * 10
+        # A_batch = torch.stack([b[1] for b in miniBatch]).to(torch.device(self.args.device))
+        # ## batchsize 
+        # R_batch = torch.stack([b[2] for b in miniBatch]).to(torch.device(self.args.device))
+        # St1_batch = torch.stack([b[3] for b in miniBatch]).to(torch.device(self.args.device))
+        # Done_batch = torch.stack([b[4] for b in miniBatch]).to(dtype = torch.float32, device = torch.device(self.args.device))
+
+        minibatch_memory, minibatch_memory_demo = self.dataLoader.getbatch(r)
+        S_batch, A_batch, R_batch, St1_batch, Done_batch = minibatch_memory
+        S_batch_demo, A_batch_demo, R_batch_demo, St1_batch_demo, Done_batch_demo = minibatch_memory_demo
+
+        S_batch_cat = torch.cat((S_batch, S_batch_demo), axis = 0)
+        A_batch_cat = torch.cat((A_batch, A_batch_demo), axis = 0)
+        R_batch_cat = torch.cat((R_batch, R_batch_demo), axis = 0)
+        St1_batch_cat = torch.cat((St1_batch, St1_batch_demo), axis = 0)
+        Done_batch_cat = torch.cat((Done_batch, Done_batch_demo), axis = 0)
 
         
         # Double DQN
-        A_Y_minibatch = F.one_hot(torch.argmax(self.Qnet(St1_batch), axis = 1), self.args.actionNum)
-        Y_minibatch = R_batch.reshape((-1, 1)) + self.args.gamma * torch.sum(A_Y_minibatch * self.target_Qnet(St1_batch), axis = 1, keepdim = True) * Done_batch.reshape((-1, 1))
+        # A_Y_minibatch = F.one_hot(torch.argmax(self.Qnet(St1_batch), axis = 1), self.args.actionNum)
+        # Y_minibatch = R_batch.reshape((-1, 1)) + self.args.gamma * torch.sum(A_Y_minibatch * self.target_Qnet(St1_batch), axis = 1, keepdim = True) * Done_batch.reshape((-1, 1))
+        
+        A_Y_minibatch_cat = F.one_hot(torch.argmax(self.Qnet(St1_batch_cat), axis = 1), self.args.actionNum)
+        Y_minibatch = R_batch_cat.reshape((-1, 1)) + self.args.gamma * torch.sum(A_Y_minibatch_cat * self.target_Qnet(St1_batch_cat), axis = 1, keepdim = True) * Done_batch_cat.reshape((-1, 1))
+        X_minibatch = torch.sum(A_batch_cat * self.Qnet(S_batch_cat), axis = 1, keepdim = True)
 
         return X_minibatch, Y_minibatch
     
