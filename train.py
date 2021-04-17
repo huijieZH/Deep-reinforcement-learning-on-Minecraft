@@ -6,6 +6,8 @@ from network.DQN import DQN, DoubleDQN
 
 from prepocess import create_actionspace, prepare_dataset
 
+from dataloader.dataloader import MineCraftRLDataLoader
+
 
 parser = argparse.ArgumentParser()
 def launch_params():
@@ -15,7 +17,7 @@ def launch_params():
                         default = '/home/huijiezhang/DeepReinforcementLearningMinecraft/EECS_545_Final_Project')
     parser.add_argument('--DATASET_LOC',
                         help='location of the dataset', 
-                        default = '/home/huijiezhang/DeepReinforcementLearningMinecraft/EECS_545_Final_Project/data/MineRLTreechop-v0')
+                        default = '/home/huijiezhang/DeepReinforcementLearningMinecraft/EECS_545_Final_Project/data/MineRLTreechopVectorObf-v0')
     ####  actionspace
     parser.add_argument('--ACTIONSPACE_TYPE',choices=['manually', 'k_means'],
                         help='way to define the actionsapce',
@@ -37,7 +39,7 @@ def launch_params():
     ######################### about RL training #####################
     parser.add_argument('--env',
                         help='the environment for minerl to make', 
-                        default = 'MineRLTreechop-v0')
+                        default = 'MineRLTreechopVectorObf-v0')
     parser.add_argument('--port',
                         help='the port to launch Minecraft', 
                         default = 5656)
@@ -72,7 +74,7 @@ def launch_params():
                     default = 200)   
     parser.add_argument('--EXPLORE', type = int,
                     help='step for explore, and after that the net would train', 
-                    default = 300000)  
+                    default = 600000)  
     parser.add_argument('--INITIAL_EPSILON', type = float,
                     help='epsilon at the beginning of explore', 
                     default = 0.1)
@@ -90,15 +92,15 @@ def launch_params():
                     default = 32)
     parser.add_argument('--UPDATE_INTERVAL', type = int,
                     help='update interval between current network and target network', 
-                    default = 10)
+                    default = 100)
 
     ######################### Dataset ##################
     parser.add_argument('--INITIAL_R', type = float,
                     help='initial ratio for the demonstration data in the training mini batch', 
-                    default = 0.8)
+                    default = 1.0)
     parser.add_argument('--FINAL_R', type = float,
                     help='final ratio for the demonstration data in the training mini batch', 
-                    default = 0.01)
+                    default = 0.1)
 
     
 
@@ -111,7 +113,8 @@ if __name__ == "__main__":
     ## create action space
     actionspace = create_actionspace(args)
 
-    ## prepare dataset
+    # prepare dataset
+
     if args.PREPARE_DATASET:
         prepare_dataset(args, actionspace)
     

@@ -21,6 +21,11 @@ try:
 except ImportError:    
     from dataloader.dataloader import MineCraftRLDataLoader
 
+import time
+
+from pfrl.replay_buffers.replay_buffer import ReplayBuffer
+from pfrl.collections.prioritized import PrioritizedBuffer
+from pfrl.replay_buffers.prioritized import PrioritizedReplayBuffer
 
 class DQN_QNet(nn.Module):
     def __init__(self, args):
@@ -28,33 +33,41 @@ class DQN_QNet(nn.Module):
         self.actionNum = args.actionNum
         self.initialDim = args.dim_DQN_Qnet
         self.layers = nn.Sequential(
-            ## cat 4 RBG images together
-            # -1*12*64*64 -> -1*64*16*16
+            ## cat 1 RBG images together
+            # -1*3*64*64 -> -1*64*32*23
             nn.Conv2d(args.CONTINUOUS_FRAME * 3, self.initialDim, 3, padding = 1),
             nn.ReLU(),
             nn.Conv2d(self.initialDim, self.initialDim, 3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(3, padding = 1, stride = 4),
+            nn.MaxPool2d(3, padding = 1, stride = 2),
 
-            # -1*64*16*16 -> -1*128*4*4
+            # -1*64*32*32 -> -1*128*16*16
             nn.Conv2d(self.initialDim, self.initialDim * 2, 3, padding = 1),
             nn.ReLU(),
             nn.Conv2d(self.initialDim * 2, self.initialDim * 2, 3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(3, padding = 1, stride = 4),
+            nn.MaxPool2d(3, padding = 1, stride = 2),
 
-            # -1*128*4*4 -> -1*256*1*1
+            # -1*128*16*16 -> -1*256*8*8
             nn.Conv2d(self.initialDim * 2, self.initialDim * 4, 3, padding = 1),
             nn.ReLU(),
             nn.Conv2d(self.initialDim * 4, self.initialDim * 4, 3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d(3, padding = 1, stride = 4),
+            nn.MaxPool2d(3, padding = 1, stride = 2),
 
-            # -1*(256*1*1) -> 256
+            # -1*256*8*8 -> -1*512*4*4
+            nn.Conv2d(self.initialDim * 4, self.initialDim * 8, 3, padding = 1),
+            nn.ReLU(),
+            nn.Conv2d(self.initialDim * 8, self.initialDim * 8, 3, padding = 1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, padding = 1, stride = 2),
+
+            # -1*(512*4*4) -> 8192
             nn.Flatten(),
-            # -1*256 -> 256
-            nn.Linear(self.initialDim * 4, self.initialDim * 4),
-            nn.Linear(self.initialDim * 4, self.actionNum),
+            # -1*8192 -> 512
+            nn.Linear(self.initialDim * 8 * 4 * 4, self.initialDim * 8),
+            nn.ReLU(),
+            nn.Linear(self.initialDim * 8, self.actionNum),
         )
     
     def forward(self, x):
@@ -68,7 +81,7 @@ class DQN(MineCraftRL):
         ## this is the current network
         self.Qnet = DQN_QNet(self.args)
         self.Qnet.to(torch.device(self.args.device))
-
+        summary(self.Qnet, (3,64, 64))
         ## this is the target network
         self.target_Qnet = copy.deepcopy(self.Qnet)
         self.iter_update = 0
@@ -76,15 +89,15 @@ class DQN(MineCraftRL):
         self.actionspace = actionspace
 
         self.env = env
-        self.action = self.env.action_space.noop()
-        self.replaybuffer = deque()
+        # self.replaybuffer = deque()
+        self.replaybuffer = ReplayBuffer(capacity=selfargs.REPLAY_MEMORY)
         ## 
         self.S = torch.zeros((self.args.CONTINUOUS_FRAME, 3, 64, 64))
         self.totalReward = 0
 
 
         self.criterion = nn.MSELoss()
-        self.optimizer = optim.Adam(self.Qnet.parameters(), 5e-4, weight_decay=1e-4)
+        self.optimizer = optim.Adam(self.Qnet.parameters(), 2.5e-4, weight_decay=1e-5)
 
         self.dataLoader = MineCraftRLDataLoader(self.args, self.replaybuffer)
 
@@ -136,12 +149,12 @@ class DQN(MineCraftRL):
 
         #given minibatch
         X_minibatch, Y_minibatch = self.get_minibatch(r)
-        
+
         self.optimizer.zero_grad()
         loss = self.criterion(X_minibatch, Y_minibatch)
         loss.backward()
         self.optimizer.step()
-                
+    
         self.iter_update += 1
         if self.iter_update >= self.args.UPDATE_INTERVAL:
             self.iter_update = 0
@@ -164,18 +177,14 @@ class DQN(MineCraftRL):
         return done
     
     def step_interact(self, action_index):
-        action_take = self.actionspace[str(action_index)]
-        for a in action_take:
-            if a == "camera":
-                self.action[a] = action_take[a]
-            else:
-                ## add some uncertainty
-                self.action[a] = 1 if np.random.rand() < action_take[a] else 0
+        action_take = {
+            'vector': self.actionspace.cluster_centers_[action_index]
+        }
         
-        obs, reward, done, info = self.env.step(self.action)
-        state = torch.tensor(obs["pov"]).to(torch.float32)
-        state_normalize = (state - torch.mean(state.reshape((-1, 3)), axis = 0))/torch.std(state.reshape((-1, 3)), axis = 0)
-        state_normalize = state_normalize.permute(2, 0, 1)
+        
+        obs, reward, done, info = self.env.step(action_take)
+        state = torch.tensor(obs["pov"]).to(torch.float32)/255.0
+        state = state.permute(2, 0, 1)
 
         S_new = torch.cat((self.S[1:, :, :, :], state_normalize.reshape((1, 3, 64, 64))), axis = 0)
 
@@ -195,19 +204,6 @@ class DQN(MineCraftRL):
         return reward, done
     
     def get_minibatch(self, r):
-        # miniBatch = random.sample(self.replaybuffer, self.args.MINIBATCH)
-
-        # Y_minibatch = torch.zeros((self.args.MINIBATCH,)).to(torch.device(self.args.device))
-        # X_minibatch = torch.zeros((self.args.MINIBATCH,)).to(torch.device(self.args.device))
-
-        # ## batchsize * 3 * 64 * 64
-        # S_batch = torch.stack([b[0] for b in miniBatch]).to(torch.device(self.args.device))
-        # ## batchsize * 10
-        # A_batch = torch.stack([b[1] for b in miniBatch]).to(torch.device(self.args.device))
-        # ## batchsize 
-        # R_batch = torch.stack([b[2] for b in miniBatch]).to(torch.device(self.args.device))
-        # St1_batch = torch.stack([b[3] for b in miniBatch]).to(torch.device(self.args.device))
-        # Done_batch = torch.stack([b[4] for b in miniBatch]).to(dtype = torch.float32, device = torch.device(self.args.device))
 
         minibatch_memory, minibatch_memory_demo = self.dataLoader.getbatch(r)
         S_batch, A_batch, R_batch, St1_batch, Done_batch = minibatch_memory
@@ -218,10 +214,8 @@ class DQN(MineCraftRL):
         R_batch_cat = torch.cat((R_batch, R_batch_demo), axis = 0)
         St1_batch_cat = torch.cat((St1_batch, St1_batch_demo), axis = 0)
         Done_batch_cat = torch.cat((Done_batch, Done_batch_demo), axis = 0)
-        # DQN
-        
-        # Y_minibatch = R_batch.reshape((-1, 1)) + self.args.gamma * torch.max(self.target_Qnet(St1_batch), axis = 1)[0].reshape((-1, 1)) * Done_batch.reshape((-1, 1))
-        # X_minibatch = torch.sum(A_batch * self.Qnet(S_batch), axis = 1, keepdim = True)
+
+
         Y_minibatch = R_batch_cat.reshape((-1, 1)) + self.args.gamma * torch.max(self.target_Qnet(St1_batch_cat), axis = 1)[0].reshape((-1, 1)) * Done_batch_cat.reshape((-1, 1))
         X_minibatch = torch.sum(A_batch_cat * self.Qnet(S_batch_cat), axis = 1, keepdim = True)
 
@@ -239,7 +233,6 @@ class DQN(MineCraftRL):
     def savemodel(self, step):
         torch.save({
             'model_state_dict': self.Qnet.state_dict(),
-            'action': self.action,
             'args':self.args,
             }, "./saved_network/" + self.arch + "_" + self.args.env + "_" + "0"*(7 - len(str(step))) + str(step)+".pt")
 
@@ -249,19 +242,6 @@ class DoubleDQN(DQN):
         self.arch = "DoubleDQN"
     
     def get_minibatch(self, r):
-        # miniBatch = random.sample(self.replaybuffer, self.args.MINIBATCH)
-
-        # Y_minibatch = torch.zeros((self.args.MINIBATCH,)).to(torch.device(self.args.device))
-        # X_minibatch = torch.zeros((self.args.MINIBATCH,)).to(torch.device(self.args.device))
-
-        # ## batchsize * 12 * 64 * 64
-        # S_batch = torch.stack([b[0] for b in miniBatch]).to(torch.device(self.args.device))
-        # ## batchsize * 10
-        # A_batch = torch.stack([b[1] for b in miniBatch]).to(torch.device(self.args.device))
-        # ## batchsize 
-        # R_batch = torch.stack([b[2] for b in miniBatch]).to(torch.device(self.args.device))
-        # St1_batch = torch.stack([b[3] for b in miniBatch]).to(torch.device(self.args.device))
-        # Done_batch = torch.stack([b[4] for b in miniBatch]).to(dtype = torch.float32, device = torch.device(self.args.device))
 
         minibatch_memory, minibatch_memory_demo = self.dataLoader.getbatch(r)
         S_batch, A_batch, R_batch, St1_batch, Done_batch = minibatch_memory
@@ -274,12 +254,10 @@ class DoubleDQN(DQN):
         Done_batch_cat = torch.cat((Done_batch, Done_batch_demo), axis = 0)
 
         
-        # Double DQN
-        # A_Y_minibatch = F.one_hot(torch.argmax(self.Qnet(St1_batch), axis = 1), self.args.actionNum)
-        # Y_minibatch = R_batch.reshape((-1, 1)) + self.args.gamma * torch.sum(A_Y_minibatch * self.target_Qnet(St1_batch), axis = 1, keepdim = True) * Done_batch.reshape((-1, 1))
         
         A_Y_minibatch_cat = F.one_hot(torch.argmax(self.Qnet(St1_batch_cat), axis = 1), self.args.actionNum)
-        Y_minibatch = R_batch_cat.reshape((-1, 1)) + self.args.gamma * torch.sum(A_Y_minibatch_cat * self.target_Qnet(St1_batch_cat), axis = 1, keepdim = True) * Done_batch_cat.reshape((-1, 1))
+        Y_minibatch = R_batch_cat.reshape((-1, 1)) + self.args.gamma * \
+            torch.sum(A_Y_minibatch_cat * self.target_Qnet(St1_batch_cat), axis = 1, keepdim = True) * Done_batch_cat.reshape((-1, 1))
         X_minibatch = torch.sum(A_batch_cat * self.Qnet(S_batch_cat), axis = 1, keepdim = True)
 
         return X_minibatch, Y_minibatch
