@@ -50,7 +50,7 @@ def launch_params():
 
     parser.add_argument('--saveStep', type = int,
                     help='the number of step between savings', 
-                    default = 50000)
+                    default = 5000)
 
     ######################### network architecture ##################
     parser.add_argument('--ARCH', choices=['DQN', 'DoubleDQN', 'DQFD'],
@@ -77,10 +77,10 @@ def launch_params():
                     default = 600000)  
     parser.add_argument('--INITIAL_EPSILON', type = float,
                     help='epsilon at the beginning of explore', 
-                    default = 0.1)
+                    default = 0.5)
     parser.add_argument('--FINAL_EPSILON', type = float,
                     help='epsilon at the end of explore', 
-                    default = 0.0001)
+                    default = 0.01)
     parser.add_argument('--REPLAY_MEMORY', type = float,
                     help='buffer size for replay', 
                     default = 10000)
@@ -101,9 +101,32 @@ def launch_params():
     parser.add_argument('--FINAL_R', type = float,
                     help='final ratio for the demonstration data in the training mini batch', 
                     default = 0.1)
-
     
-
+    #######################     PDDQN    #################
+    parser.add_argument('--alpha', 
+                    help='Exponent of errors to compute probabilities to sample', 
+                    default = 0.6)
+    parser.add_argument('--beta0',
+                    help='Initial value of beta', 
+                    default = 0.4)
+    parser.add_argument('--betasteps',
+                    help='Steps to anneal beta to 1', 
+                    default = 2e5)
+    parser.add_argument('--eps',
+                    help='To revisit a step after its error becomes near zero', 
+                    default = 0.01)
+    parser.add_argument('--normalize_by_max',
+                    help='Method to normalize weights', 
+                    default = True)
+    parser.add_argument('--error_min',
+                    help='', 
+                    default = 0)
+    parser.add_argument('--error_max',
+                    help='', 
+                    default = 1)
+    parser.add_argument('--num_steps',
+                    help='', 
+                    default = 1)                    
 if __name__ == "__main__":
     launch_params()
     args = parser.parse_args()

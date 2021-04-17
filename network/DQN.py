@@ -79,49 +79,72 @@ class DQN(MineCraftRL):
         self.arch = "DQN"
         self.args = args
         ## this is the current network
-        self.Qnet = DQN_QNet(self.args)
-        self.Qnet.to(torch.device(self.args.device))
-        summary(self.Qnet, (3,64, 64))
-        ## this is the target network
-        self.target_Qnet = copy.deepcopy(self.Qnet)
         self.iter_update = 0
 
         self.actionspace = actionspace
 
         self.env = env
         # self.replaybuffer = deque()
-        self.replaybuffer = ReplayBuffer(capacity=selfargs.REPLAY_MEMORY)
+        self.replaybuffer = PrioritizedReplayBuffer(
+                                         capacity=self.args.REPLAY_MEMORY,
+                                         alpha=self.args.alpha, beta0=self.args.beta0,
+                                         betasteps=self.args.betasteps,
+                                         eps=self.args.eps,
+                                         normalize_by_max=self.args.normalize_by_max,
+                                         error_min=self.args.error_min,
+                                         error_max=self.args.error_max,
+                                         num_steps=self.args.num_steps)
         ## 
         self.S = torch.zeros((self.args.CONTINUOUS_FRAME, 3, 64, 64))
         self.totalReward = 0
-
-
-        self.criterion = nn.MSELoss()
-        self.optimizer = optim.Adam(self.Qnet.parameters(), 2.5e-4, weight_decay=1e-5)
 
         self.dataLoader = MineCraftRLDataLoader(self.args, self.replaybuffer)
 
         self.losses = []
         self.totalRewards = []
 
-        self.initialstep = 0
-        self.initialepsilon = self.args.INITIAL_EPSILON
-        self.initialR = self.args.INITIAL_R
+        self.Qnet = DQN_QNet(self.args)
+        self.Qnet.to(torch.device(self.args.device))
+
+        if self.args.LOADING_MODEL:
+            pass
+            # models = os.listdir("./saved_network/")
+            # models.sort()
+            # data = torch.load(os.path.join("./saved_network/", models[-1]))
+            # self.Qnet.load_state_dict(['model_state_dict'])
+
+            # self.criterion = nn.MSELoss()
+            # self.optimizer = optim.Adam(self.Qnet.parameters(), 2.5e-4, weight_decay=1e-5)
+
+            # self.initialstep = 0
+            # self.initialepsilon = self.args.INITIAL_EPSILON
+            # self.initialR = self.args.INITIAL_R
+        else:
+
+            # summary(self.Qnet, (3,64, 64))
+            ## this is the target network
+            self.target_Qnet = copy.deepcopy(self.Qnet)
+            self.criterion = nn.MSELoss()
+            self.optimizer = optim.Adam(self.Qnet.parameters(), 2.5e-4, weight_decay=1e-5)
+
+            self.initialstep = 0
+            self.initialepsilon = self.args.INITIAL_EPSILON
+            self.initialR = self.args.INITIAL_R
 
     def train(self):
-        epsilon = self.initialepsilon
-        step = self.initialstep
-        r = self.initialR
+        self.epsilon = self.initialepsilon
+        self.step = self.initialstep
+        self.r = self.initialR
         while True:
-            step += 1
-            if step < self.args.OBSERVE:
-                done = self.step_observe(step, epsilon)
-            elif step < self.args.OBSERVE + self.args.EXPLORE:
-                epsilon -= (self.args.INITIAL_EPSILON - self.args.FINAL_EPSILON) / self.args.EXPLORE
-                r -= (self.args.INITIAL_R - self.args.FINAL_R) / self.args.EXPLORE
-                done = self.step_train(step, epsilon, r)
+            self.step += 1
+            if self.step < self.args.OBSERVE:
+                done = self.step_observe(self.step, self.epsilon)
+            elif self.step < self.args.OBSERVE + self.args.EXPLORE:
+                self.epsilon -= (self.args.INITIAL_EPSILON - self.args.FINAL_EPSILON) / self.args.EXPLORE
+                self.r -= (self.args.INITIAL_R - self.args.FINAL_R) / self.args.EXPLORE
+                done = self.step_train(self.step, self.epsilon, self.r)
             else:
-                done = self.step_train(step, epsilon, r)
+                done = self.step_train(self.step, self.epsilon, self.r)
             ## refresh every 10000 steps or done
             if done:
                 self.totalReward = 0
@@ -172,7 +195,6 @@ class DQN(MineCraftRL):
         ## save model
         if step % self.args.saveStep == 0:
             self.savemodel(step)
-
         
         return done
     
@@ -186,18 +208,24 @@ class DQN(MineCraftRL):
         state = torch.tensor(obs["pov"]).to(torch.float32)/255.0
         state = state.permute(2, 0, 1)
 
-        S_new = torch.cat((self.S[1:, :, :, :], state_normalize.reshape((1, 3, 64, 64))), axis = 0)
+        S_new = torch.cat((self.S[1:, :, :, :], state.reshape((1, 3, 64, 64))), axis = 0)
 
         action_one_hot = F.one_hot(torch.tensor([action_index]), self.args.actionNum).squeeze()
-        self.replaybuffer.append((self.S.reshape((-1, 64, 64)), 
-                                  action_one_hot, 
-                                  torch.tensor([reward]), 
-                                  S_new.reshape((-1, 64, 64)),
-                                  torch.tensor([not done]),
-                                  ))
+        # self.replaybuffer.append((self.S.reshape((-1, 64, 64)), 
+        #                           action_one_hot, 
+        #                           torch.tensor([reward]), 
+        #                           S_new.reshape((-1, 64, 64)),
+        #                           torch.tensor([not done]),
+        #                           ))
+        self.replaybuffer.append(
+                                state = self.S.reshape((-1, 64, 64)), 
+                                action = action_one_hot, 
+                                reward = torch.tensor([reward]), 
+                                next_state = S_new.reshape((-1, 64, 64)), 
+                                is_state_terminal = done)
         self.S = S_new
-        if len(self.replaybuffer) > self.args.REPLAY_MEMORY:
-            self.replaybuffer.popleft()
+        # if len(self.replaybuffer) > self.args.REPLAY_MEMORY:
+        #     self.replaybuffer.popleft()
 
         self.totalReward += reward
 
@@ -234,6 +262,9 @@ class DQN(MineCraftRL):
         torch.save({
             'model_state_dict': self.Qnet.state_dict(),
             'args':self.args,
+            'epsilon':self.epsilon,
+            'step':self.step,
+            'r':self.r,
             }, "./saved_network/" + self.arch + "_" + self.args.env + "_" + "0"*(7 - len(str(step))) + str(step)+".pt")
 
 class DoubleDQN(DQN):
@@ -253,6 +284,7 @@ class DoubleDQN(DQN):
         St1_batch_cat = torch.cat((St1_batch, St1_batch_demo), axis = 0)
         Done_batch_cat = torch.cat((Done_batch, Done_batch_demo), axis = 0)
 
+
         
         
         A_Y_minibatch_cat = F.one_hot(torch.argmax(self.Qnet(St1_batch_cat), axis = 1), self.args.actionNum)
@@ -260,5 +292,8 @@ class DoubleDQN(DQN):
             torch.sum(A_Y_minibatch_cat * self.target_Qnet(St1_batch_cat), axis = 1, keepdim = True) * Done_batch_cat.reshape((-1, 1))
         X_minibatch = torch.sum(A_batch_cat * self.Qnet(S_batch_cat), axis = 1, keepdim = True)
 
+        error = (Y_minibatch - X_minibatch).to(torch.device("cpu")).detach().numpy()
+        self.dataLoader.replaybuffer.update_errors(error[:self.dataLoader.memory_batchsize])
+        self.dataLoader.replaybuffer_demonstration.update_errors(error[self.dataLoader.memory_batchsize:])
         return X_minibatch, Y_minibatch
     
