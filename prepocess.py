@@ -14,10 +14,10 @@ parser = argparse.ArgumentParser()
 def launch_params():
     parser.add_argument('--ROOT',
                         help='root',
-                        default = '/home/huijiezhang/DeepReinforcementLearningMinecraft/EECS_545_Final_Project')
+                        default = '/home/huijie/EECS545/EECS_545_Final_Project')
     parser.add_argument('--DATASET_LOC',
                         help='location of the dataset', 
-                        default = '/home/huijiezhang/DeepReinforcementLearningMinecraft/EECS_545_Final_Project/data/rawdata/MineRLTreechop-v0')
+                        default = '/home/huijie/EECS545/EECS_545_Final_Project/data/rawdata/MineRLTreechopVectorObf-v0')
     parser.add_argument('--env',
                         help='the environment for minerl', 
                         default = 'MineRLTreechopVectorObf-v0')

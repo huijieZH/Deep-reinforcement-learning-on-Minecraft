@@ -14,10 +14,10 @@ def launch_params():
     ######################### prepocess ############################
     parser.add_argument('--ROOT',
                         help='root',
-                        default = '/home/huijiezhang/DeepReinforcementLearningMinecraft/EECS_545_Final_Project')
+                        default = '/home/huijie/EECS545/EECS_545_Final_Project')
     parser.add_argument('--DATASET_LOC',
                         help='location of the dataset', 
-                        default = '/home/huijiezhang/DeepReinforcementLearningMinecraft/EECS_545_Final_Project/data/MineRLTreechopVectorObf-v0')
+                        default = '/home/huijie/EECS545/EECS_545_Final_Project/data/MineRLTreechopVectorObf-v0')
     ####  actionspace
     parser.add_argument('--ACTIONSPACE_TYPE',choices=['manually', 'k_means'],
                         help='way to define the actionsapce',
@@ -29,12 +29,12 @@ def launch_params():
     parser.add_argument('--PREPARE_DATASET',
                         help='if True, would automatically prepare dataset',
                         default=False)
-    parser.add_argument('--DATA_TOTAL',
-                        help='total data from demonstration',
-                        default=400000)
-    parser.add_argument('--DATA_PER_FILE',
-                        help='per file data from demonstration, please remove the last file if it has different number',
-                        default=5000)
+    # parser.add_argument('--DATA_TOTAL',
+    #                     help='total data from demonstration',
+    #                     default=400000)
+    # parser.add_argument('--DATA_PER_FILE',
+    #                     help='per file data from demonstration, please remove the last file if it has different number',
+    #                     default=5000)
 
     ######################### about RL training #####################
     parser.add_argument('--env',
@@ -83,7 +83,7 @@ def launch_params():
                     default = 0.01)
     parser.add_argument('--REPLAY_MEMORY', type = float,
                     help='buffer size for replay', 
-                    default = 10000)
+                    default = 100000)
     parser.add_argument('--CONTINUOUS_FRAME', type = int,
                     help='number of continuous frame to be stacked together', 
                     default = 1)
@@ -92,7 +92,10 @@ def launch_params():
                     default = 32)
     parser.add_argument('--UPDATE_INTERVAL', type = int,
                     help='update interval between current network and target network', 
-                    default = 100)
+                    default = 5000)
+    parser.add_argument('--ACTION_UPDATE_INTERVAL', type = int,
+                    help='step intervals between update action', 
+                    default = 5)
 
     ######################### Dataset ##################
     parser.add_argument('--INITIAL_R', type = float,

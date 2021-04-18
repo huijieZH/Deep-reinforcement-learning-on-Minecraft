@@ -106,6 +106,9 @@ class DQN(MineCraftRL):
         self.Qnet = DQN_QNet(self.args)
         self.Qnet.to(torch.device(self.args.device))
 
+        self.action_update = 0
+        self.action_index = 0
+
         if self.args.LOADING_MODEL:
             pass
             # models = os.listdir("./saved_network/")
@@ -136,7 +139,6 @@ class DQN(MineCraftRL):
         self.step = self.initialstep
         self.r = self.initialR
         while True:
-            self.step += 1
             if self.step < self.args.OBSERVE:
                 done = self.step_observe(self.step, self.epsilon)
             elif self.step < self.args.OBSERVE + self.args.EXPLORE:
@@ -145,30 +147,35 @@ class DQN(MineCraftRL):
                 done = self.step_train(self.step, self.epsilon, self.r)
             else:
                 done = self.step_train(self.step, self.epsilon, self.r)
+            self.action_update += 1
+            self.step += 1
             ## refresh every 10000 steps or done
             if done:
                 self.totalReward = 0
                 self.env.reset()
 
     def step_observe(self, step, epsilon):
-        action_index = np.random.randint(self.args.actionNum)
-        reward, done = self.step_interact(action_index)
+        if self.action_update % self.args.ACTION_UPDATE_INTERVAL == 0:
+            self.action_index = np.random.randint(self.args.actionNum)
+            self.action_update = 0
+        reward, done = self.step_interact(self.action_index)
 
         self.log(step, "OBSERVE", epsilon, action_index, reward, self.totalReward)
 
         return done
 
     def step_train(self, step, epsilon, r):
-        input = self.S.reshape((1, -1, 64, 64)).to(torch.device(self.args.device))
-        output = self.Qnet(input)
-        # choose an action epsilon greedily
-        if torch.rand(1) < epsilon:
-            print("----------Random Action----------")
-            action_index = np.random.randint(self.args.actionNum)
-        else:
-            action_index = int(torch.argmax(output))
+        if self.action_update % self.args.ACTION_UPDATE_INTERVAL == 0:
+            input = self.S.reshape((1, -1, 64, 64)).to(torch.device(self.args.device))
+            output = self.Qnet(input)
+            # choose an action epsilon greedily
+            if torch.rand(1) < epsilon:
+                print("----------Random Action----------")
+                self.action_index = np.random.randint(self.args.actionNum)
+            else:
+                self.action_index = int(torch.argmax(output))
         
-        reward, done = self.step_interact(action_index)
+        reward, done = self.step_interact(self.action_index)
 
         #given minibatch
         X_minibatch, Y_minibatch = self.get_minibatch(r)
@@ -247,6 +254,10 @@ class DQN(MineCraftRL):
         Y_minibatch = R_batch_cat.reshape((-1, 1)) + self.args.gamma * torch.max(self.target_Qnet(St1_batch_cat), axis = 1)[0].reshape((-1, 1)) * Done_batch_cat.reshape((-1, 1))
         X_minibatch = torch.sum(A_batch_cat * self.Qnet(S_batch_cat), axis = 1, keepdim = True)
 
+        error = (Y_minibatch - X_minibatch).to(torch.device("cpu")).detach().numpy()
+        self.dataLoader.replaybuffer.update_errors(error[:self.dataLoader.memory_batchsize])
+        self.dataLoader.replaybuffer_demonstration.update_errors(error[self.dataLoader.memory_batchsize:])
+
         return X_minibatch, Y_minibatch
 
     def new_reward(self, reward):
@@ -285,8 +296,6 @@ class DoubleDQN(DQN):
         Done_batch_cat = torch.cat((Done_batch, Done_batch_demo), axis = 0)
 
 
-        
-        
         A_Y_minibatch_cat = F.one_hot(torch.argmax(self.Qnet(St1_batch_cat), axis = 1), self.args.actionNum)
         Y_minibatch = R_batch_cat.reshape((-1, 1)) + self.args.gamma * \
             torch.sum(A_Y_minibatch_cat * self.target_Qnet(St1_batch_cat), axis = 1, keepdim = True) * Done_batch_cat.reshape((-1, 1))
