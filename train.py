@@ -2,7 +2,7 @@ import minerl
 import gym
 import argparse
 
-from network.DQN import DQN, DoubleDQN
+from network.DQN import DQN, DoubleDQN, DQFD
 
 from prepocess import create_actionspace, prepare_dataset
 
@@ -18,6 +18,9 @@ def launch_params():
     parser.add_argument('--DATASET_LOC',
                         help='location of the dataset', 
                         default = '/home/huijie/EECS545/EECS_545_Final_Project/data/MineRLTreechopVectorObf-v0')
+    parser.add_argument('--MODEL_SAVE',
+                        help='location of the dataset', 
+                        default = '/home/huijie/EECS545/EECS_545_Final_Project/saved_network/DQFD10step_marginloss_pretrain175000')
     ####  actionspace
     parser.add_argument('--ACTIONSPACE_TYPE',choices=['manually', 'k_means'],
                         help='way to define the actionsapce',
@@ -55,13 +58,13 @@ def launch_params():
     ######################### network architecture ##################
     parser.add_argument('--ARCH', choices=['DQN', 'DoubleDQN', 'DQFD'],
                     help='the architecture for reinforcement learning', 
-                    default = 'DoubleDQN')
+                    default = 'DQFD')
 
     ############# DQN 
     parser.add_argument('--LOADING_MODEL', 
                     help='if True, the network would automatically search saved network in ./saved_network \
                         ; if False, the network would train a new network', 
-                    default = False)
+                    default = True)
 
     parser.add_argument('--device', 
                     help='running device for training model', 
@@ -71,7 +74,10 @@ def launch_params():
                     default = 32)
     parser.add_argument('--OBSERVE', type = int,
                     help='step for observe', 
-                    default = 200)   
+                    default = 200)
+    parser.add_argument('--PRETRAIN', type = int,
+                    help='step for explore, and after that the net would train', 
+                    default = 200000)     
     parser.add_argument('--EXPLORE', type = int,
                     help='step for explore, and after that the net would train', 
                     default = 600000)  
@@ -80,7 +86,7 @@ def launch_params():
                     default = 0.5)
     parser.add_argument('--FINAL_EPSILON', type = float,
                     help='epsilon at the end of explore', 
-                    default = 0.01)
+                    default = 0.05)
     parser.add_argument('--REPLAY_MEMORY', type = float,
                     help='buffer size for replay', 
                     default = 100000)
@@ -95,15 +101,28 @@ def launch_params():
                     default = 5000)
     parser.add_argument('--ACTION_UPDATE_INTERVAL', type = int,
                     help='step intervals between update action', 
-                    default = 5)
+                    default = 3)
+    parser.add_argument('--TRAINING_INTERVAL', type = int,
+                    help='training interval between frame', 
+                    default = 5)   
+    parser.add_argument('--VIDEO_FRAME', type = int,
+                    help='video frames', 
+                    default = 4000) 
+                
+    parser.add_argument('--n', type = int,
+                    help='n-step', 
+                    default = 25)
 
-    ######################### Dataset ##################
+    ######################### DQFD ##################
     parser.add_argument('--INITIAL_R', type = float,
                     help='initial ratio for the demonstration data in the training mini batch', 
-                    default = 1.0)
+                    default = 0.8)
     parser.add_argument('--FINAL_R', type = float,
                     help='final ratio for the demonstration data in the training mini batch', 
-                    default = 0.1)
+                    default = 0)
+    parser.add_argument('--loss_coeff_margin', type = float,
+                    help='final ratio for the demonstration data in the training mini batch', 
+                    default = 1.0)
     
     #######################     PDDQN    #################
     parser.add_argument('--alpha', 
@@ -150,5 +169,5 @@ if __name__ == "__main__":
     env.make_interactive(port=args.port, realtime=True)
 
     obs  = env.reset()
-    net = DoubleDQN(args, actionspace, env)
+    net = DQFD(args, actionspace, env)
     net.train()

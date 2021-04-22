@@ -85,7 +85,6 @@ class MineCraftRLDataLoader(object):
             self.replaybuffer_demonstration.save(prebufferPath)
     def getbatch(self, r):
 
-
         self.demonstration_batchsize = int(r * self.args.MINIBATCH)
         self.memory_batchsize = self.args.MINIBATCH - self.demonstration_batchsize
         
@@ -101,11 +100,11 @@ class MineCraftRLDataLoader(object):
         # St1_batch = torch.stack([b[3] for b in miniBatch]).to(torch.device(self.args.device))
         # Done_batch = torch.stack([b[4] for b in miniBatch]).to(dtype = torch.float32, device = torch.device(self.args.device))
 
-        S_batch = torch.stack([torch.tensor(b[0]['state']) for b in miniBatch]).to(torch.device(self.args.device))
-        A_batch = torch.stack([torch.tensor(b[0]['action']) for b in miniBatch]).to(torch.device(self.args.device))
-        R_batch = torch.stack([torch.tensor(b[0]['reward']) for b in miniBatch]).to(torch.device(self.args.device))
+        S_batch = torch.stack([b[0]['state'].clone().detach() for b in miniBatch]).to(torch.device(self.args.device))
+        A_batch = torch.stack([b[0]['action'].clone().detach() for b in miniBatch]).to(torch.device(self.args.device))
+        R_batch = torch.stack([torch.tensor(b[0]['reward']) for b in miniBatch]).reshape((-1, 1)).to(torch.device(self.args.device))
         Done_batch = torch.stack([torch.tensor([not b[0]['is_state_terminal']]) for b in miniBatch]).to(dtype = torch.float32, device = torch.device(self.args.device))
-        St1_batch = torch.stack([torch.tensor(b[0]['next_state']) for b in miniBatch]).to(dtype = torch.float32, device = torch.device(self.args.device))
+        St1_batch = torch.stack([b[0]['next_state'].clone().detach() for b in miniBatch]).to(dtype = torch.float32, device = torch.device(self.args.device))
 
         minibatch_memory = (S_batch, A_batch, R_batch, St1_batch, Done_batch)
 

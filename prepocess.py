@@ -9,6 +9,7 @@ import tqdm
 import torch.nn.functional as F
 import torch
 import pickle
+from collections import deque
 
 parser = argparse.ArgumentParser()
 def launch_params():
@@ -34,6 +35,13 @@ def launch_params():
     parser.add_argument('--PREPARE_DATASET',
                         help='if True, would automatically prepare dataset',
                         default=True)
+    
+    parser.add_argument('--n', type = int,
+                    help='n -step', 
+                    default = 25)
+    parser.add_argument('--gamma', type = float,
+                    help='gamma', 
+                    default = 0.99)
     # parser.add_argument('--DATA_TOTAL',
     #                     help='total data from demonstration',
     #                     default=400000)
@@ -70,24 +78,24 @@ def create_actionspace(args):
                 pickle.dump(kmeans, f)
     return kmeans
 
-def vectorize(act):
-    vec1 = np.concatenate([act["camera"][0][0],act["attack"][0],act["back"][0]])
-    vec2 = np.concatenate([act["forward"][0],act["left"][0],act["right"][0]])
-    vec = np.concatenate([vec1,vec2,act["jump"][0]])
-    return vec
+# def vectorize(act):
+#     vec1 = np.concatenate([act["camera"][0][0],act["attack"][0],act["back"][0]])
+#     vec2 = np.concatenate([act["forward"][0],act["left"][0],act["right"][0]])
+#     vec = np.concatenate([vec1,vec2,act["jump"][0]])
+#     return vec
 
-def vectorize_v2(act):
-    vec = np.array([ act["camera"][0],
-                     act["camera"][1],
-                     act["attack"],
-                     act["back"],
-                     act["forward"],
-                     act["left"],
-                     act["right"],
-                     act["jump"], 
-                     act['sprint'], 
-                     act['sneak'] ])
-    return vec
+# def vectorize_v2(act):
+#     vec = np.array([ act["camera"][0],
+#                      act["camera"][1],
+#                      act["attack"],
+#                      act["back"],
+#                      act["forward"],
+#                      act["left"],
+#                      act["right"],
+#                      act["jump"], 
+#                      act['sprint'], 
+#                      act['sneak'] ])
+#     return vec
 
 def prepare_dataset(args, actionspace):
     ## matrixlize the actionspace
@@ -103,22 +111,34 @@ def prepare_dataset(args, actionspace):
     if not os.path.exists(video_root):
         os.mkdir(video_root)
     
-    test = True
     data = minerl.data.make(args.env)
+    r_memory = deque()
     for current_state, action, reward, _, done in data.batch_iter(
                 batch_size=1, num_epochs=1, seq_len=1):
         
-
         s = current_state['pov'][0, 0, :, :, :].astype(np.float32)/255.0
         s = np.moveaxis(s, -1, 0)
-        if test:
-            test = False
-            print(s)
         r = np.array([reward[0, 0]])
-        t = np.array([not done[0, 0]])
         action_index = actionspace.predict(action['vector'][0, :])
         action_one_hot = F.one_hot(torch.tensor([int(action_index)]), args.actionNum).squeeze()
-        np.savez(os.path.join(video_root, "{:04d}.npz".format(frame_index)), s.reshape((-1, 64, 64)), action_one_hot, r, t)
+        t = np.array([not done[0, 0]])
+        ## n-step reward
+        r_memory.append((s.reshape((-1, 64, 64)), action_one_hot, r, t))
+        if t == False:
+            ## the frame is terminal
+            r_memory_list = list(r_memory)
+            for data in r_memory_list:
+                s, a, r, t = r_memory.popleft()
+                for i in range(len(r_memory)):
+                    r += r_memory[i][2] * (args.gamma**i)
+                np.savez(os.path.join(video_root, "{:04d}.npz".format(frame_index - args.n - i +  len(r_memory) )), s, a, r, t)
+        else:
+            ## after accumulate n-step
+            if len(r_memory) >= args.n:
+                s, a, r, t = r_memory.popleft()
+                for i in range(len(r_memory)):
+                    r += r_memory[i][2] * (args.gamma**(i + 1))
+                np.savez(os.path.join(video_root, "{:04d}.npz".format(frame_index - args.n + 1)), s, a, r, t)
 
         frame_index += 1
         
