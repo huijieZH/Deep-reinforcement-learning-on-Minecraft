@@ -75,73 +75,90 @@ class DQN_QNet(nn.Module):
 
 class DQN(MineCraftRL):
     def __init__(self, args, actionspace, env):
-        ## load model or create a new model
-        self.arch = "DQN"
-        self.args = args
-        ## this is the current network
-        self.iter_update = 0
+        if args.mode == 'train':
+            ## load model or create a new model
+            self.arch = "DQN"
+            self.args = args
+            ## this is the current network
+            self.iter_update = 0
 
-        self.actionspace = actionspace
+            self.actionspace = actionspace
 
-        self.env = env
-        # self.replaybuffer = deque()
-        self.replaybuffer = PrioritizedReplayBuffer(
-                                         capacity=self.args.REPLAY_MEMORY,
-                                         alpha=self.args.alpha, beta0=self.args.beta0,
-                                         betasteps=self.args.betasteps,
-                                         eps=self.args.eps,
-                                         normalize_by_max=self.args.normalize_by_max,
-                                         error_min=self.args.error_min,
-                                         error_max=self.args.error_max,
-                                         num_steps=self.args.num_steps)
-        ## 
-        self.S = torch.zeros((self.args.CONTINUOUS_FRAME, 3, 64, 64))
-        self.totalReward = 0
+            self.env = env
+            # self.replaybuffer = deque()
+            self.replaybuffer = PrioritizedReplayBuffer(
+                                            capacity=self.args.REPLAY_MEMORY,
+                                            alpha=self.args.alpha, beta0=self.args.beta0,
+                                            betasteps=self.args.betasteps,
+                                            eps=self.args.eps,
+                                            normalize_by_max=self.args.normalize_by_max,
+                                            error_min=self.args.error_min,
+                                            error_max=self.args.error_max,
+                                            num_steps=self.args.num_steps)
+            ## 
+            self.S = torch.zeros((self.args.CONTINUOUS_FRAME, 3, 64, 64))
+            self.totalReward = 0
 
-        self.dataLoader = MineCraftRLDataLoader(self.args, self.replaybuffer)
+            self.dataLoader = MineCraftRLDataLoader(self.args, self.replaybuffer)
 
-        self.losses = []
-        self.totalRewards = []
+            self.losses = []
+            self.totalRewards = []
 
-        self.Qnet = DQN_QNet(self.args)
-        self.Qnet.to(torch.device(self.args.device))
+            self.Qnet = DQN_QNet(self.args)
+            self.Qnet.to(torch.device(self.args.device))
 
-        self.action_update = 0
-        self.action_index = 0
+            self.action_update = 0
+            self.action_index = 0
 
-        self.step_memory = deque()
+            self.step_memory = deque()
 
-        if not os.path.exists(self.args.MODEL_SAVE):
-            os.mkdir(self.args.MODEL_SAVE)
-        models = os.listdir(self.args.MODEL_SAVE)
-
-        if self.args.LOADING_MODEL and len(models) != 0:
+            if not os.path.exists(self.args.MODEL_SAVE):
+                os.mkdir(self.args.MODEL_SAVE)
             models = os.listdir(self.args.MODEL_SAVE)
-            models.sort()
-            data = torch.load(os.path.join(self.args.MODEL_SAVE, models[-1]))
-            self.Qnet.load_state_dict(data['model_state_dict'])
-            self.target_Qnet = copy.deepcopy(self.Qnet)
 
-            self.criterion = nn.MSELoss()
-            self.optimizer = optim.Adam(self.Qnet.parameters(), 2e-5, weight_decay=1e-5)
-            self.initialstep = data['step']
-            self.initialepsilon = data['epsilon']
-            # self.initialR = data['r']
-            self.initialR = 0
-            self.OBSERVE_FROM_MODEL =True
-            # self.initialstep = 0
-            # self.initialepsilon = self.args.INITIAL_EPSILON
-            # self.initialR = self.args.INITIAL_R
-        else:
-            # summary(self.Qnet, (3,64, 64))
-            ## this is the target network
-            self.target_Qnet = copy.deepcopy(self.Qnet)
-            self.criterion = nn.MSELoss()
-            self.optimizer = optim.Adam(self.Qnet.parameters(), 2.5e-4, weight_decay=1e-5)
-            self.initialstep = 0
-            self.initialepsilon = self.args.INITIAL_EPSILON
-            self.initialR = self.args.INITIAL_R
-            self.OBSERVE_FROM_MODEL =False
+            if self.args.LOADING_MODEL and len(models) != 0:
+                models = os.listdir(self.args.MODEL_SAVE)
+                models.sort()
+                data = torch.load(os.path.join(self.args.MODEL_SAVE, models[-1]))
+                self.Qnet.load_state_dict(data['model_state_dict'])
+                self.target_Qnet = copy.deepcopy(self.Qnet)
+
+                self.criterion = nn.MSELoss()
+                self.optimizer = optim.Adam(self.Qnet.parameters(), 2e-5, weight_decay=1e-5)
+                self.initialstep = data['step']
+                self.initialepsilon = data['epsilon']
+                # self.initialR = data['r']
+                self.initialR = 0
+                self.OBSERVE_FROM_MODEL =True
+                # self.initialstep = 0
+                # self.initialepsilon = self.args.INITIAL_EPSILON
+                # self.initialR = self.args.INITIAL_R
+            else:
+                # summary(self.Qnet, (3,64, 64))
+                ## this is the target network
+                self.target_Qnet = copy.deepcopy(self.Qnet)
+                self.criterion = nn.MSELoss()
+                self.optimizer = optim.Adam(self.Qnet.parameters(), 2.5e-4, weight_decay=1e-5)
+                self.initialstep = 0
+                self.initialepsilon = self.args.INITIAL_EPSILON
+                self.initialR = self.args.INITIAL_R
+                self.OBSERVE_FROM_MODEL =False
+                
+        
+        elif args.mode == 'evaluate':
+            self.args = args
+            ## this is the current network
+            self.iter_update = 0
+            self.actionspace = actionspace
+            self.env = env
+            self.Qnet = DQN_QNet(self.args).to(torch.device(self.args.device))
+            data = torch.load(os.path.join(self.args.MODEL_SAVE, self.args.agentname))
+            self.Qnet.load_state_dict(data['model_state_dict'])
+            self.action_index = 0
+            self.totalReward = 0
+            self.totalRewards = []
+            self.S = torch.zeros((self.args.CONTINUOUS_FRAME, 3, 64, 64))
+
     def train(self):
         self.epsilon = self.initialepsilon
         self.step = self.initialstep
@@ -156,13 +173,13 @@ class DQN(MineCraftRL):
                 self.r -= (self.args.INITIAL_R - self.args.FINAL_R) / self.args.PRETRAIN 
                 self.epsilon -= (self.args.INITIAL_EPSILON - self.args.FINAL_EPSILON) / (self.args.EXPLORE + self.args.PRETRAIN)
 
-                self.r = max(0.05, self.r)
-                self.epsilon = max(0, self.epsilon)
+                self.r = max(self.args.FINAL_R, self.r)
+                self.epsilon = max(self.args.FINAL_EPSILON, self.epsilon)
                 done = self.step_train(self.step, self.epsilon, self.r)
             
             elif self.step < self.args.OBSERVE + self.args.EXPLORE + self.args.PRETRAIN :
                 self.epsilon -= (self.args.INITIAL_EPSILON - self.args.FINAL_EPSILON) / (self.args.EXPLORE + self.args.PRETRAIN)
-                self.epsilon = max(0.05, self.epsilon)
+                self.epsilon = max(self.args.FINAL_EPSILON, self.epsilon)
                 done = self.step_train(self.step, self.epsilon, self.r)
 
             else:
@@ -328,6 +345,57 @@ class DQN(MineCraftRL):
         ## more than on the previous reward
         return reward
 
+    
+    def evaluate(self):
+        step = 0
+        action_update = 0
+        eval_num = 0
+        while eval_num < self.args.EVALUATE_NUM:
+
+            if action_update % self.args.ACTION_UPDATE_INTERVAL == 0:
+                input = self.S.reshape((1, -1, 64, 64)).to(torch.device(self.args.device))
+                with torch.no_grad():
+                    output = self.Qnet(input)      
+                if torch.rand(1) < self.args.EPSILON:
+                    print("----------Random Action----------")
+                    self.action_index = np.random.randint(self.args.actionNum)
+                else:
+                    self.action_index = int(torch.argmax(output))    
+            reward, done = self.step_evaluate(self.action_index)
+
+            self.log(step, "OBSERVE", 0, self.action_index, reward, self.totalReward)
+
+
+            step += 1
+            action_update += 1
+
+            if done:
+                self.totalRewards.append(self.totalReward)
+                self.totalReward = 0
+                self.env.reset()
+                eval_num += 1
+                torch.save({
+                "rewards":self.totalRewards,
+                }, os.path.join(self.args.MODEL_SAVE, self.args.agentname[:-3] + "test_result"+".pt"))
+
+                
+
+    
+    def step_evaluate(self, action_index):
+        action_take = {
+            'vector': self.actionspace.cluster_centers_[action_index]
+        }
+        
+        
+        obs, reward, done, info = self.env.step(action_take)
+        state = torch.tensor(obs["pov"]).to(torch.float32)/255.0
+        state = state.permute(2, 0, 1)
+        self.S = state
+
+        self.totalReward += reward
+
+        return reward, done
+
     def log(self, step, state, epsilon, action_index, totalReward, loss):
         print("/ SArchitecture", self.arch, "/ STIMESTEP", step, "/ STATE", state, \
         "/ EPSILON", np.round(epsilon, 4), "/ ACTION", action_index, \
@@ -382,6 +450,9 @@ class DQFD(DQN):
         S_batch, A_batch, R_batch, St1_batch, Done_batch = minibatch_memory
         S_batch_demo, A_batch_demo, R_batch_demo, St1_batch_demo, Done_batch_demo = minibatch_memory_demo
 
+        A_batch  = A_batch.to(torch.float32)
+        A_batch_demo = A_batch_demo.to(torch.float32)
+
         S_batch_cat = torch.cat((S_batch, S_batch_demo), axis = 0)
         A_batch_cat = torch.cat((A_batch, A_batch_demo), axis = 0)
         R_batch_cat = torch.cat((R_batch, R_batch_demo), axis = 0)
@@ -400,13 +471,13 @@ class DQFD(DQN):
 
         Q_demo = self.Qnet(S_batch_demo)
         Q_max, Q_argmax = torch.max(Q_demo, axis = 1)
-        A_demo = F.one_hot(Q_argmax, self.args.actionNum)
+        A_demo = F.one_hot(Q_argmax, self.args.actionNum).to(torch.float32)
         Q_s_aE = torch.sum(Q_demo * A_batch_demo, axis = 1)
 
-        l_a_aE = torch.sum(A_demo != A_batch_demo)/2
+        l_a_aE = self.criterion(A_demo, A_batch_demo) * A_demo.shape[0] * A_demo.shape[1]/2
 
-        margin_loss = torch.sum(Q_max - Q_s_aE) + l_a_aE
-
+        # margin_loss = torch.sum(Q_max - Q_s_aE) + l_a_aE
+        margin_loss = torch.sum(Q_max - Q_s_aE)
         return X_minibatch, Y_minibatch, margin_loss
 
     
@@ -432,7 +503,10 @@ class DQFD(DQN):
 
             self.optimizer.zero_grad()
 
-            loss = self.criterion(X_minibatch, Y_minibatch) + self.args.loss_coeff_margin * margin_loss/self.args.MINIBATCH
+            # loss = self.criterion(X_minibatch, Y_minibatch) + self.args.loss_coeff_margin * margin_loss/self.args.MINIBATCH
+            # loss = self.criterion(X_minibatch, torch.rand(X_minibatch.shape).to(self.args.device)) \
+            #         + self.args.loss_coeff_margin * margin_loss/self.args.MINIBATCH
+            loss = self.criterion(X_minibatch, Y_minibatch)
             loss.backward()
             self.optimizer.step()
         
