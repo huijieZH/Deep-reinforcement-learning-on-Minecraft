@@ -105,7 +105,7 @@ python3 -u evaluate.py \
         --n 25 \
 ```
 The results of different architecture is shown in the table:
-
+<img src='image/result.png' width="600"/>
 
 
 
