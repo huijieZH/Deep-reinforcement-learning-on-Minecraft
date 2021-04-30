@@ -13,13 +13,13 @@ def launch_params():
     ######################### prepocess ############################
     parser.add_argument('--ROOT',
                         help='root',
-                        default = '/home/huijie/EECS545/EECS_545_Final_Project')
+                        default = './EECS_545_Final_Project')
     parser.add_argument('--DATASET_LOC',
                         help='location of the dataset', 
-                        default = '/home/huijie/EECS545/EECS_545_Final_Project/data/MineRLTreechopVectorObf-v0')
+                        default = './data/MineRLTreechopVectorObf-v0')
     parser.add_argument('--MODEL_SAVE',
                         help='location of the dataset', 
-                        default = '/home/huijie/EECS545/EECS_545_Final_Project/saved_network/DQFD10step_marginloss_pretrain')
+                        default = './saved_network')
     parser.add_argument('--ACTIONSPACE_TYPE',choices=['manually', 'k_means'],
                         help='way to define the actionsapce',
                         default='k_means')

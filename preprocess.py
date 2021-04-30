@@ -1,0 +1,136 @@
+import argparse
+import json
+import os
+import numpy as np
+import imageio
+import minerl
+from sklearn.cluster import KMeans
+import tqdm
+import torch.nn.functional as F
+import torch
+import pickle
+from collections import deque
+
+parser = argparse.ArgumentParser()
+def launch_params():
+    parser.add_argument('--ROOT',
+                        help='root',
+                        default = './')
+    parser.add_argument('--DATASET_LOC',
+                        help='location of the dataset', 
+                        default = './data/rawdata/MineRLTreechopVectorObf-v0')
+    parser.add_argument('--env',
+                        help='the environment for minerl', 
+                        default = 'MineRLTreechopVectorObf-v0')
+
+    ##### actionspace
+    parser.add_argument('--actionNum', type=int,
+                        help='the number of discrete action combination',
+                        default=32)
+    parser.add_argument('--ACTIONSPACE_TYPE',choices=['manually', 'k_means'],
+                        help='way to define the actionsapce',
+                        default='k_means')
+    
+    ##### prepare dataset
+    parser.add_argument('--PREPARE_DATASET',
+                        help='if True, would automatically prepare dataset',
+                        default=True)
+    
+    parser.add_argument('--n', type = int,
+                    help='n -step', 
+                    default = 25)
+    parser.add_argument('--gamma', type = float,
+                    help='gamma', 
+                    default = 0.99)
+
+def create_actionspace(args):
+    actionspace = {}
+    actionspace_path = os.path.join(args.ROOT, "actionspace")
+
+    if args.ACTIONSPACE_TYPE == 'k_means':
+        actionspaceFile = os.path.join(actionspace_path, args.env + "_" + args.ACTIONSPACE_TYPE + "_" + str(args.actionNum) + ".pickle")
+        if os.path.exists(actionspaceFile):
+            with open(actionspaceFile, 'rb') as f:
+                kmeans = pickle.load(f)
+        else:
+            dat = minerl.data.make(args.env)
+            act_vectors = []
+            L = 100000
+            for _, act, _, _,_ in tqdm.tqdm(dat.batch_iter(1, 1, 1, preload_buffer_size=20)):
+                act_vectors.append(act['vector'])
+                if len(act_vectors) > L:
+                    break
+
+            # Reshape these the action batches
+            acts = np.concatenate(act_vectors).reshape(-1, 64)
+            kmeans_acts = acts[:L]
+
+            # Use sklearn to cluster the demonstrated actions
+            kmeans = KMeans(n_clusters=args.actionNum, random_state=0).fit(kmeans_acts)
+            print(kmeans)
+            with open(actionspaceFile, "wb") as f:
+                pickle.dump(kmeans, f)
+    return kmeans
+
+def prepare_dataset(args, actionspace):
+    ## matrixlize the actionspace
+    ## act_vec is actionNum X actionDim
+
+    root = os.path.join(args.ROOT, "data", "processdata" ,args.env + "_preprocess")
+    if not os.path.exists(root):
+        os.mkdir(root)
+
+    videoindex = 0
+    frame_index = 0
+    video_root = os.path.join(root, "{:03d}".format(videoindex))
+    if not os.path.exists(video_root):
+        os.mkdir(video_root)
+    
+    data = minerl.data.make(args.env)
+    r_memory = deque()
+    for current_state, action, reward, _, done in data.batch_iter(
+                batch_size=1, num_epochs=1, seq_len=1):
+        
+        s = current_state['pov'][0, 0, :, :, :].astype(np.float32)/255.0
+        s = np.moveaxis(s, -1, 0)
+        r = np.array([reward[0, 0]])
+        action_index = actionspace.predict(action['vector'][0, :])
+        action_one_hot = F.one_hot(torch.tensor([int(action_index)]), args.actionNum).squeeze()
+        t = np.array([not done[0, 0]])
+        ## n-step reward
+        r_memory.append((s.reshape((-1, 64, 64)), action_one_hot, r, t))
+        if t == False:
+            ## the frame is terminal
+            r_memory_list = list(r_memory)
+            for data in r_memory_list:
+                s, a, r, t = r_memory.popleft()
+                for i in range(len(r_memory)):
+                    r += r_memory[i][2] * (args.gamma**i)
+                np.savez(os.path.join(video_root, "{:04d}.npz".format(frame_index - args.n - i +  len(r_memory) )), s, a, r, t)
+        else:
+            ## after accumulate n-step
+            if len(r_memory) >= args.n:
+                s, a, r, t = r_memory.popleft()
+                for i in range(len(r_memory)):
+                    r += r_memory[i][2] * (args.gamma**(i + 1))
+                np.savez(os.path.join(video_root, "{:04d}.npz".format(frame_index - args.n + 1)), s, a, r, t)
+
+        frame_index += 1
+        
+        if done:
+            videoindex += 1
+            frame_index = 0
+            video_root = os.path.join(root, "{:03d}".format(videoindex))
+            if not os.path.exists(video_root):
+                os.mkdir(video_root)
+        
+
+if __name__ == "__main__":
+    launch_params()
+    args = parser.parse_args()
+
+    actionspace = create_actionspace(args)
+    if args.PREPARE_DATASET:
+        prepare_dataset(args, actionspace)
+
+    

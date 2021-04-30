@@ -14,13 +14,13 @@ def launch_params():
     ######################### prepocess ############################
     parser.add_argument('--ROOT',
                         help='root',
-                        default = '/home/huijie/EECS545/EECS_545_Final_Project')
+                        default = './')
     parser.add_argument('--DATASET_LOC',
                         help='location of the dataset', 
-                        default = '/home/huijie/EECS545/EECS_545_Final_Project/data/MineRLTreechopVectorObf-v0')
+                        default = './data/MineRLTreechopVectorObf-v0')
     parser.add_argument('--MODEL_SAVE',
                         help='location of the dataset', 
-                        default = '/home/huijie/EECS545/EECS_545_Final_Project/saved_network/DQFD10step_marginloss_pretrain180000')
+                        default = ./saved_network')
     ####  actionspace
     parser.add_argument('--ACTIONSPACE_TYPE',choices=['manually', 'k_means'],
                         help='way to define the actionsapce',
@@ -32,12 +32,6 @@ def launch_params():
     parser.add_argument('--PREPARE_DATASET',
                         help='if True, would automatically prepare dataset',
                         default=False)
-    # parser.add_argument('--DATA_TOTAL',
-    #                     help='total data from demonstration',
-    #                     default=400000)
-    # parser.add_argument('--DATA_PER_FILE',
-    #                     help='per file data from demonstration, please remove the last file if it has different number',
-    #                     default=5000)
 
     ######################### about RL training #####################
     parser.add_argument('--env',
