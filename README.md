@@ -1,4 +1,7 @@
 ## Overview
+<img src='image/finalDemo.gif' width="500"/>
+
+
 This repo is the Final Project for EECS 545, University Michigan, Ann Arbor, Spring 2021 term. The project intends to train a tree chopping agent in the Minecraft environment using Deep Q-leanring from demonstration. The project is highly inspired from the competition MineRL, you could find more details about the competition [here](https://minerl.io/docs/).
 
 ## Table of contents
@@ -75,13 +78,34 @@ python3 -u preprocess.py \
         --actionNum 32 \
         --PREPARE_DATASET True \
         --n 25 \
-        --gamma 0.99 \
 ```
 It would generate the output frames in ``<YOUR LOCAL REPO PATH>/data/processdata`` and actionspace in ``<YOUR LOCAL REPO PATH>/actionspace``
 
 ## Train
 
+If you like to train your own agent, be sure that your PC have at least 32 GB RAM:
+```bash
+python3 -u train.py \
+        --ROOT <YOUR LOCAL REPO PATH> \
+        --DATASET_LOC <YOUR LOCAL REPO PATH>/data/rawdata/MineRLTreechopVectorObf-v0 \
+        --MODEL_SAVE <YOUR LOCAL REPO PATH>/saved_network\
+        --actionNum 32 \
+        --n 25 \
+```
+
 ## Evaluate
+We also provide our best train agent in ``<YOUR LOCAL REPO PATH>/saved_network/best_model.pt``, you could run it by:
+```bash
+python3 -u evaluate.py \
+        --ROOT <YOUR LOCAL REPO PATH> \
+        --DATASET_LOC <YOUR LOCAL REPO PATH>/data/rawdata/MineRLTreechopVectorObf-v0 \
+        --MODEL_SAVE <YOUR LOCAL REPO PATH>/saved_network\
+        --agentname best_model.pt
+        --actionNum 32 \
+        --n 25 \
+```
+The results of different architecture is shown in the table:
+
 
 
 
