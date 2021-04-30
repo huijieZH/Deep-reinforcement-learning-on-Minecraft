@@ -5,7 +5,7 @@ import argparse
 
 from network.DQN import DQN, DoubleDQN, DQFD
 
-from prepocess import create_actionspace
+from preprocess import create_actionspace
 
 parser = argparse.ArgumentParser()
 
@@ -13,7 +13,7 @@ def launch_params():
     ######################### prepocess ############################
     parser.add_argument('--ROOT',
                         help='root',
-                        default = './EECS_545_Final_Project')
+                        default = './')
     parser.add_argument('--DATASET_LOC',
                         help='location of the dataset', 
                         default = './data/MineRLTreechopVectorObf-v0')
@@ -53,7 +53,7 @@ def launch_params():
                     default = 'evaluate')  
     parser.add_argument('--agentname',
                     help='mode should be train or evaluate', 
-                    default = 'DQFD_MineRLTreechopVectorObf-v0_0100000.pt')         
+                    default = 'best_model.pt')         
     parser.add_argument('--ACTION_UPDATE_INTERVAL', type = int,
                     help='step intervals between update action', 
                     default = 3)

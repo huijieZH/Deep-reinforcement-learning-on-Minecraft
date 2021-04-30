@@ -4,7 +4,7 @@ import argparse
 
 from network.DQN import DQN, DoubleDQN, DQFD
 
-from prepocess import create_actionspace, prepare_dataset
+from preprocess import create_actionspace, prepare_dataset
 
 from dataloader.dataloader import MineCraftRLDataLoader
 
@@ -20,7 +20,7 @@ def launch_params():
                         default = './data/MineRLTreechopVectorObf-v0')
     parser.add_argument('--MODEL_SAVE',
                         help='location of the dataset', 
-                        default = ./saved_network')
+                        default = './saved_network')
     ####  actionspace
     parser.add_argument('--ACTIONSPACE_TYPE',choices=['manually', 'k_means'],
                         help='way to define the actionsapce',
