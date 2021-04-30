@@ -19,7 +19,7 @@ The code depends on the following libraries:
 * MineRL
 * PFRL
 
-The envionment of Minecraft is wrapped by MineRL, so please follow the [document](https://minerl.io/docs/) to install the MineRL library first. Be sure you could successfully run the following test code from in the document :
+The envionment of Minecraft is wrapped by MineRL, so please follow the [document](https://minerl.io/docs/) to install the MineRL library first. Be sure you could successfully run the following test code from the document :
 
 ```python
 import minerl
@@ -50,6 +50,34 @@ while not done:
 PFRL in a library implementing some state-of-art deep reinforcement learning algorithm. Our project use it for the prioritized buffer. You could find more details about their work [here](https://pfrl.readthedocs.io/en/latest/index.html)
 
 ## Dataset
+
+To download the demonstration data from human, you could follow the guidance in the [document](https://minerl.io/docs/) to the local path ``<YOUR LOCAL REPO PATH>/data/rawdata``, or more specific:
+
+```bash
+sudo gedit ~/.bashrc
+```
+Add ``export MINERL_DATA_ROOT=<YOUR LOCAL REPO PATH>/data/rawdata`` at the end of the file and save it, then:
+
+```bash
+source ~./bashrc
+```
+
+Then download the specific dataset ``MineRLTreechopVectorObf-v0``
+```bash
+python3 -m minerl.data.download "MineRLTreechopVectorObf-v0"
+```
+
+Then we should preprocess the dataset to extract the frames and calculate the actionspace:
+```bash
+python3 -u preprocess.py \
+        --ROOT <YOUR LOCAL REPO PATH> \
+        --DATASET_LOC <YOUR LOCAL REPO PATH>/data/rawdata/MineRLTreechopVectorObf-v0 \
+        --actionNum 32 \
+        --PREPARE_DATASET True \
+        --n 25 \
+        --gamma 0.99 \
+```
+It would generate the output frames in ``<YOUR LOCAL REPO PATH>/data/processdata`` and actionspace in ``<YOUR LOCAL REPO PATH>/actionspace``
 
 ## Train
 
