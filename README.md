@@ -100,9 +100,12 @@ python3 -u evaluate.py \
         --ROOT <YOUR LOCAL REPO PATH> \
         --DATASET_LOC <YOUR LOCAL REPO PATH>/data/rawdata/MineRLTreechopVectorObf-v0 \
         --MODEL_SAVE <YOUR LOCAL REPO PATH>/saved_network\
+        --agentname best_model.pt
         --actionNum 32 \
         --n 25 \
 ```
+The results of different architecture is shown in the table:
+
 
 
 
