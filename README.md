@@ -73,8 +73,8 @@ python3 -m minerl.data.download "MineRLTreechopVectorObf-v0"
 Then we should preprocess the dataset to extract the frames and calculate the actionspace:
 ```bash
 python3 -u preprocess.py \
-        --ROOT <YOUR LOCAL REPO PATH> \
-        --DATASET_LOC <YOUR LOCAL REPO PATH>/data/rawdata/MineRLTreechopVectorObf-v0 \
+        --ROOT "./" \
+        --DATASET_LOC "./data/rawdata/MineRLTreechopVectorObf-v0" \
         --actionNum 32 \
         --PREPARE_DATASET True \
         --n 25 \
@@ -86,9 +86,9 @@ It would generate the output frames in ``<YOUR LOCAL REPO PATH>/data/processdata
 If you like to train your own agent, be sure that your PC have at least 32 GB RAM:
 ```bash
 python3 -u train.py \
-        --ROOT <YOUR LOCAL REPO PATH> \
-        --DATASET_LOC <YOUR LOCAL REPO PATH>/data/rawdata/MineRLTreechopVectorObf-v0 \
-        --MODEL_SAVE <YOUR LOCAL REPO PATH>/saved_network\
+        --ROOT "./" \
+        --DATASET_LOC "./data/rawdata/MineRLTreechopVectorObf-v0" \
+        --MODEL_SAVE "./saved_network"\
         --actionNum 32 \
         --n 25 \
 ```
@@ -97,9 +97,9 @@ python3 -u train.py \
 We also provide our best train agent in ``<YOUR LOCAL REPO PATH>/saved_network/best_model.pt``, you could run it by:
 ```bash
 python3 -u evaluate.py \
-        --ROOT <YOUR LOCAL REPO PATH> \
-        --DATASET_LOC <YOUR LOCAL REPO PATH>/data/rawdata/MineRLTreechopVectorObf-v0 \
-        --MODEL_SAVE <YOUR LOCAL REPO PATH>/saved_network\
+        --ROOT "./" \
+        --DATASET_LOC "./data/rawdata/MineRLTreechopVectorObf-v0" \
+        --MODEL_SAVE "./saved_network"\
         --agentname best_model.pt
         --actionNum 32 \
         --n 25 \
